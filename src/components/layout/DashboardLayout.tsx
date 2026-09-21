@@ -157,11 +157,7 @@ const DashboardLayout: React.FC = () => {
             <Menu size={24} />
           </button>
           <div className="flex-1 flex justify-center">
-            <img 
-              src="/images/logo.png" 
-              alt="DAWMS Logo" 
-              className="h-8" 
-            />
+            <span className="text-lg font-bold text-gray-900">Asset Management System</span>
           </div>
           <div className="flex items-center">
             <button 
@@ -234,11 +230,7 @@ const DashboardLayout: React.FC = () => {
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         `}>
           <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
-            <img 
-              src="/images/logo.png" 
-              alt="DAWMS Logo" 
-              className="h-8" 
-            />
+            <span className="text-lg font-bold text-gray-900">Asset Management System</span>
             <button
               type="button"
               className="text-gray-500 hover:text-gray-700"
@@ -300,12 +292,7 @@ const DashboardLayout: React.FC = () => {
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
         <div className="flex-1 flex flex-col min-h-0 border-r border-gray-200 bg-white">
           <div className="flex items-center h-16 px-6 border-b border-gray-200">
-            <img 
-              src="/images/logo.png" 
-              alt="DAWMS Logo" 
-              className="h-8" 
-            />
-            <span className="ml-2 text-lg font-semibold text-gray-900">DAWMS</span>
+            <span className="text-lg font-bold text-gray-900">Asset Management System</span>
           </div>
           <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
             <nav className="mt-5 flex-1 px-4 space-y-1">

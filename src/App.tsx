@@ -43,6 +43,7 @@ function App() {
         <Route path="/assets" element={<AssetsList />} />
         <Route path="/assets/new" element={<AssetForm />} />
         <Route path="/assets/:id" element={<AssetDetails />} />
+        <Route path="/assets/:id/edit" element={<AssetForm />} />
         <Route path="/warranties" element={<WarrantyList />} />
         <Route path="/warranties/new" element={<WarrantyForm />} />
         <Route path="/warranties/:id" element={<WarrantyDetails />} />

@@ -133,7 +133,7 @@ const FinancialInsights: React.FC = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <div className="p-6">
             <h3 className="text-sm font-medium text-gray-500">Total Asset Value</h3>
@@ -148,15 +148,6 @@ const FinancialInsights: React.FC = () => {
             <h3 className="text-sm font-medium text-gray-500">Total Maintenance Costs</h3>
             <p className="mt-2 text-3xl font-semibold text-gray-900">
               ₱{totalMaintenanceCost.toLocaleString()}
-            </p>
-          </div>
-        </Card>
-
-        <Card>
-          <div className="p-6">
-            <h3 className="text-sm font-medium text-gray-500">Total Depreciation</h3>
-            <p className="mt-2 text-3xl font-semibold text-gray-900">
-              ₱{depreciationRecords.reduce((sum, record) => sum + record.depreciationAmount, 0).toLocaleString()}
             </p>
           </div>
         </Card>
@@ -208,26 +199,6 @@ const FinancialInsights: React.FC = () => {
                   <Legend />
                   <Bar dataKey="cost" name="Maintenance Cost" fill="#8884d8" />
                 </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </Card>
-
-        {/* Depreciation Trends */}
-        <Card>
-          <div className="p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Depreciation Trends</h3>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={depreciationByMonth}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip formatter={(value: number) => `₱${value.toLocaleString()}`} />
-                  <Legend />
-                  <Line type="monotone" dataKey="value" name="Asset Value" stroke="#8884d8" />
-                  <Line type="monotone" dataKey="depreciation" name="Depreciation" stroke="#82ca9d" />
-                </LineChart>
               </ResponsiveContainer>
             </div>
           </div>

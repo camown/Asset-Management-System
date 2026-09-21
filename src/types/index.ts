@@ -16,6 +16,14 @@ export interface Asset {
   serialNumber: string;
   model: string;
   category: string;
+  storage?: string;
+  gpu?: string;
+  cpu?: string;
+  ram?: string;
+  monitorQty?: number;
+  monitorSize?: string;
+  keyboardStatus?: string;
+  mouseStatus?: string;
   purchaseDate: string;
   purchasePrice: number;
   assignedTo: string | null;

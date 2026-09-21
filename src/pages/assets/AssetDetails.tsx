@@ -87,9 +87,9 @@ const AssetDetails: React.FC = () => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
-        return <Badge variant="success" dot>Active</Badge>;
+        return <Badge variant="success" dot>Working</Badge>;
       case 'maintenance':
-        return <Badge variant="warning" dot>Maintenance</Badge>;
+        return <Badge variant="warning" dot>Maintenance / Not Working</Badge>;
       case 'retired':
         return <Badge variant="default" dot>Retired</Badge>;
       case 'disposed':
@@ -151,10 +151,6 @@ const AssetDetails: React.FC = () => {
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 mb-2">Category</h3>
                   <p className="text-gray-900">{asset.category}</p>
-                </div>
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">Location</h3>
-                  <p className="text-gray-900">{asset.location}</p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 mb-2">Department</h3>

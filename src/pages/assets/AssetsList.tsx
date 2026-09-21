@@ -47,6 +47,8 @@ const AssetsList: React.FC = () => {
     fetchAssets();
   }, []);
   
+  const [viewMode, setViewMode] = useState<'parts' | 'workstations'>('workstations');
+
   useEffect(() => {
     // Filter and search assets
     let result = [...assets];
@@ -57,7 +59,10 @@ const AssetsList: React.FC = () => {
         asset.name.toLowerCase().includes(query) ||
         asset.model.toLowerCase().includes(query) ||
         asset.serialNumber.toLowerCase().includes(query) ||
-        asset.category.toLowerCase().includes(query)
+        asset.category.toLowerCase().includes(query) ||
+        (asset.assignedTo && asset.assignedTo.toLowerCase().includes(query)) ||
+        (asset.gpu && asset.gpu.toLowerCase().includes(query)) ||
+        (asset.cpu && asset.cpu.toLowerCase().includes(query))
       );
     }
     
@@ -65,8 +70,14 @@ const AssetsList: React.FC = () => {
       result = result.filter(asset => asset.status === currentFilter);
     }
     
+    if (viewMode === 'workstations') {
+      result = result.filter(asset => asset.category === 'Workstations');
+    } else if (viewMode === 'parts') {
+      result = result.filter(asset => asset.category !== 'Workstations');
+    }
+    
     setFilteredAssets(result);
-  }, [assets, searchQuery, currentFilter]);
+  }, [assets, searchQuery, currentFilter, viewMode]);
   
   useEffect(() => {
     // Add click outside handler for export menu
@@ -93,9 +104,9 @@ const AssetsList: React.FC = () => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
-        return <Badge variant="success" dot>Active</Badge>;
+        return <Badge variant="success" dot>Working</Badge>;
       case 'maintenance':
-        return <Badge variant="warning" dot>Maintenance</Badge>;
+        return <Badge variant="warning" dot>Maintenance / Not Working</Badge>;
       case 'retired':
         return <Badge variant="default" dot>Retired</Badge>;
       case 'disposed':
@@ -112,22 +123,31 @@ const AssetsList: React.FC = () => {
         return;
       }
 
-      // Format the data for export
-      const exportData = filteredAssets.map(asset => ({
-        Name: asset.name || '',
-        'Serial Number': asset.serialNumber || '',
-        Model: asset.model || '',
-        Category: asset.category || '',
-        Status: asset.status || '',
-        Location: asset.location || '',
-        Department: asset.department || '',
-        'Assigned To': asset.assignedTo || '',
-        'Purchase Date': asset.purchaseDate ? formatDate(parseISO(asset.purchaseDate), 'MMM d, yyyy') : '',
-        'Purchase Price': asset.purchasePrice ? Number(asset.purchasePrice) : 0,
-        Notes: asset.notes || ''
-      }));
+      // Format the data for export based on viewMode
+      const exportData = viewMode === 'workstations' 
+        ? filteredAssets.map(asset => ({
+            'PC NUMBER': asset.name || asset.id || '',
+            'CURRENT USER': asset.assignedTo || '',
+            GPU: asset.gpu || '—',
+            CPU: asset.cpu || '—',
+            RAM: asset.ram || '—',
+            'MONITOR QTY': asset.monitorQty || 1,
+            'MONITOR SIZE': asset.monitorSize || '—',
+            KEYBOARD: asset.keyboardStatus || 'GOOD',
+            MOUSE: asset.mouseStatus || 'GOOD',
+            'REMARKS / COMMENTS': asset.notes || ''
+          }))
+        : filteredAssets.map(asset => ({
+            'Asset ID': asset.id || asset.name || '',
+            'Serial Number / Service Tag': asset.serialNumber || '',
+            Category: asset.category || '',
+            'Storage (Size)': asset.storage || 'NA',
+            'Assigned User': asset.assignedTo || 'FREE',
+            Status: asset.status || '',
+            Notes: asset.notes || ''
+          }));
 
-      const filename = `assets-report-${new Date().toISOString().split('T')[0]}`;
+      const filename = `${viewMode === 'workstations' ? 'computer-specification-list' : 'hardware-parts-inventory'}-${new Date().toISOString().split('T')[0]}`;
       
       switch (format) {
         case 'excel':
@@ -149,6 +169,19 @@ const AssetsList: React.FC = () => {
     setSelectedAsset(asset);
     setShowQRModal(true);
   };
+
+  const handleDeleteAsset = async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to delete ${name}?`)) return;
+    try {
+      const { error } = await supabase.from('assets').delete().eq('id', id);
+      if (error) throw error;
+      toast.success(`${name} deleted successfully`);
+      setAssets(prev => prev.filter(a => a.id !== id));
+    } catch (err: any) {
+      console.error('Delete error:', err);
+      toast.error('Failed to delete item');
+    }
+  };
   
   if (loading) {
     return (
@@ -162,8 +195,14 @@ const AssetsList: React.FC = () => {
     <div>
       <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Assets</h1>
-          <p className="text-gray-600">Manage your company's hardware and equipment.</p>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {viewMode === 'workstations' ? 'Computer Specification List' : 'Hardware Parts Inventory'}
+          </h1>
+          <p className="text-gray-600">
+            {viewMode === 'workstations' 
+              ? 'Complete workstation PC specifications, user assignments, and peripheral status.'
+              : 'Track and manage company hardware components and spare parts inventory.'}
+          </p>
         </div>
         <div className="mt-4 md:mt-0">
           <div className="flex space-x-3">
@@ -202,145 +241,226 @@ const AssetsList: React.FC = () => {
                 </div>
               )}
             </div>
-            <Link
-              to="/assets/new"
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              <Plus className="h-5 w-5 mr-2" />
-              Add New Asset
+            
+            <Link to="/assets/new">
+              <Button leftIcon={<Plus size={16} />}>
+                Add Item
+              </Button>
             </Link>
           </div>
         </div>
       </div>
       
       <Card className="mb-6">
-        <div className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="md:col-span-2">
+        <div className="p-4 flex flex-col md:flex-row md:items-center md:justify-between space-y-3 md:space-y-0 md:space-x-4">
+          <div className="flex items-center space-x-3 w-full md:w-auto">
+            <div className="inline-flex rounded-md shadow-sm p-1 bg-gray-100">
+              <button
+                onClick={() => setViewMode('workstations')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                  viewMode === 'workstations'
+                    ? 'bg-white text-blue-700 shadow'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Computer Specification List ({assets.filter(a => a.category === 'Workstations').length})
+              </button>
+              <button
+                onClick={() => setViewMode('parts')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                  viewMode === 'parts'
+                    ? 'bg-white text-blue-700 shadow'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Hardware Parts Inventory ({assets.filter(a => a.category !== 'Workstations').length})
+              </button>
+            </div>
+            
+            <div className="w-full md:w-64">
               <Input
-                placeholder="Search assets..."
+                placeholder="Search..."
                 value={searchQuery}
                 onChange={handleSearch}
-                leftIcon={<Search size={16} />}
+                leftIcon={<Search size={18} />}
               />
             </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant={currentFilter === 'active' ? 'primary' : 'outline'}
-                size="sm"
-                onClick={() => handleFilterChange('active')}
-              >
-                Active
-              </Button>
-              <Button
-                variant={currentFilter === 'maintenance' ? 'primary' : 'outline'}
-                size="sm"
-                onClick={() => handleFilterChange('maintenance')}
-              >
-                Maintenance
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                rightIcon={<Filter size={16} />}
-              >
-                More
-              </Button>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="text-sm text-gray-500 flex items-center mr-2">
+              <Filter size={16} className="mr-1" />
+              Filter:
             </div>
+            <button
+              onClick={() => handleFilterChange(null)}
+              className={`px-3 py-1 text-xs font-medium rounded-full ${
+                currentFilter === null
+                  ? 'bg-blue-100 text-blue-800'
+                  : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => handleFilterChange('active')}
+              className={`px-3 py-1 text-xs font-medium rounded-full ${
+                currentFilter === 'active'
+                  ? 'bg-green-100 text-green-800'
+                  : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+              }`}
+            >
+              Working
+            </button>
+            <button
+              onClick={() => handleFilterChange('maintenance')}
+              className={`px-3 py-1 text-xs font-medium rounded-full ${
+                currentFilter === 'maintenance'
+                  ? 'bg-amber-100 text-amber-800'
+                  : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+              }`}
+            >
+              Needs Replacement / Maint
+            </button>
           </div>
         </div>
       </Card>
       
       <Card>
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Asset
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Category
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Location
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Purchase Date
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Value
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Assigned To
-                </th>
-                <th scope="col" className="relative px-6 py-3">
-                  <span className="sr-only">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredAssets.length > 0 ? (
-                filteredAssets.map((asset) => (
-                  <tr key={asset.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">{asset.name}</div>
-                          <div className="text-sm text-gray-500">{asset.serialNumber}</div>
+          {viewMode === 'workstations' ? (
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">PC NUMBER</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">CURRENT USER</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">GPU</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">CPU</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">RAM</th>
+                  <th scope="col" className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">MONITOR (QTY / SIZE)</th>
+                  <th scope="col" className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">KEYBOARD</th>
+                  <th scope="col" className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">MOUSE</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">REMARKS / COMMENTS</th>
+                  <th scope="col" className="relative px-4 py-3 text-right"><span className="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredAssets.length > 0 ? (
+                  filteredAssets.map((asset) => (
+                    <tr key={asset.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900">{asset.name || asset.id}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-blue-700">{asset.assignedTo || '—'}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-800 font-mono">{asset.gpu || '—'}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-800 font-mono">{asset.cpu || '—'}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 font-medium">{asset.ram || '—'}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-700">
+                        <span className="font-semibold text-gray-900">{asset.monitorQty}</span> <span className="text-gray-500">({asset.monitorSize})</span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-center">
+                        <span className={`px-2 py-0.5 text-xs font-bold rounded ${asset.keyboardStatus === 'REPLACE' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-green-100 text-green-700'}`}>
+                          {asset.keyboardStatus || 'GOOD'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-center">
+                        <span className={`px-2 py-0.5 text-xs font-bold rounded ${asset.mouseStatus === 'REPLACE' ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-green-100 text-green-700'}`}>
+                          {asset.mouseStatus || 'GOOD'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600 max-w-xs">
+                        {asset.notes && (
+                          <span className={`${asset.notes.toLowerCase().includes('replace') || asset.notes.toLowerCase().includes('upgrade') || asset.notes.toLowerCase().includes('lagging') ? 'text-red-600 font-medium' : ''}`}>
+                            {asset.notes}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex items-center space-x-3 justify-end">
+                          <button onClick={() => handleGenerateQR(asset)} title="Generate QR Code" className="text-blue-600 hover:text-blue-900">
+                            <QrCode size={16} />
+                          </button>
+                          <Link to={`/assets/${asset.id}`} className="text-gray-600 hover:text-gray-900">
+                            View
+                          </Link>
+                          <Link to={`/assets/${asset.id}/edit`} className="text-blue-600 hover:text-blue-900 font-semibold">
+                            Edit
+                          </Link>
+                          <button onClick={() => handleDeleteAsset(asset.id, asset.name || asset.id)} className="text-red-600 hover:text-red-900 font-semibold">
+                            Delete
+                          </button>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{asset.category}</div>
-                      <div className="text-sm text-gray-500">{asset.model}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(asset.status)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {asset.location}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDate(parseISO(asset.purchaseDate), 'MMM d, yyyy')}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      ₱{asset.purchasePrice.toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {asset.assignedTo || '—'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center space-x-2">
-                        <button 
-                          onClick={() => handleGenerateQR(asset)}
-                          title="Generate QR Code" 
-                          className="text-blue-600 hover:text-blue-900"
-                        >
-                          <QrCode size={16} />
-                        </button>
-                        <Link to={`/assets/${asset.id}`} className="text-blue-600 hover:text-blue-900">
-                          View
-                        </Link>
-                        <button className="text-gray-400 hover:text-gray-600">
-                          <MoreHorizontal size={16} />
-                        </button>
-                      </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={10} className="px-6 py-4 text-center text-gray-500">
+                      No computer specifications found.
                     </td>
                   </tr>
-                ))
-              ) : (
+                )}
+              </tbody>
+            </table>
+          ) : (
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
                 <tr>
-                  <td colSpan={8} className="px-6 py-4 text-center text-gray-500">
-                    {searchQuery || currentFilter ? 'No assets match your search or filter criteria.' : 'No assets found. Start by adding some assets.'}
-                  </td>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asset ID</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Serial Number / Service Tag</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Storage (Size)</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned User</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status / Notes</th>
+                  <th scope="col" className="relative px-6 py-3 text-right"><span className="sr-only">Actions</span></th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredAssets.length > 0 ? (
+                  filteredAssets.map((asset) => (
+                    <tr key={asset.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-semibold text-gray-900">{asset.name || asset.id}</div>
+                        <div className="text-xs text-gray-500">{asset.category}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-700">{asset.serialNumber}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{asset.storage || 'NA'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${asset.assignedTo === 'FREE' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-gray-100 text-gray-800'}`}>
+                          {asset.assignedTo || 'FREE'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center space-x-2">
+                          {getStatusBadge(asset.status)}
+                          <span className="text-sm text-gray-500">{asset.notes}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex items-center space-x-3 justify-end">
+                          <button onClick={() => handleGenerateQR(asset)} title="Generate QR Code" className="text-blue-600 hover:text-blue-900">
+                            <QrCode size={16} />
+                          </button>
+                          <Link to={`/assets/${asset.id}`} className="text-gray-600 hover:text-gray-900">
+                            View
+                          </Link>
+                          <Link to={`/assets/${asset.id}/edit`} className="text-blue-600 hover:text-blue-900 font-semibold">
+                            Edit
+                          </Link>
+                          <button onClick={() => handleDeleteAsset(asset.id, asset.name || asset.id)} className="text-red-600 hover:text-red-900 font-semibold">
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                      No hardware parts found in inventory.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
         <div className="bg-gray-50 px-6 py-3 flex items-center justify-between">
           <div className="text-sm text-gray-700">

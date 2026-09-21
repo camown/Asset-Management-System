@@ -167,7 +167,7 @@ const Dashboard: React.FC = () => {
                       }
                       dot
                     >
-                      {asset.status}
+                      {asset.status === 'active' ? 'Working' : asset.status === 'maintenance' ? 'Not Working' : asset.status}
                     </Badge>
                   </div>
                 </div>
